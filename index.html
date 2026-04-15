@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>India Solar PPA Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --border: #e2e0d8;
+    --text: #1a1916;
+    --text2: #6b6a64;
+    --text3: #9e9d97;
+    --accent: #e8a020;
+    --accent2: #1a6b3c;
+    --blue: #1a4fa0;
+    --amber-bg: #fdf3e0;
+    --amber-text: #92560a;
+    --green-bg: #e6f4ec;
+    --green-text: #1a5c34;
+    --blue-bg: #e6edf8;
+    --blue-text: #1a3f80;
+    --gray-bg: #f0efe9;
+    --gray-text: #5a5950;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .header {
+    background: var(--text);
+    color: #fff;
+    padding: 0 2rem;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo { width: 32px; height: 32px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .header h1 { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 600; letter-spacing: -0.3px; }
+  .header-sub { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .sync-status { font-size: 12px; display: flex; align-items: center; gap: 5px; }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; }
+  .sync-dot.syncing { background: var(--accent); animation: pulse 1s infinite; }
+  .sync-dot.error { background: #f87171; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .btn { height: 34px; padding: 0 16px; font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; border-radius: var(--radius-sm); border: none; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-outline { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+  .btn-outline:hover { background: rgba(255,255,255,0.18); }
+  .btn-accent { background: var(--accent); color: #1a1916; font-weight: 600; }
+  .btn-accent:hover { background: #d4911c; }
+  .btn-light { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  .btn-light:hover { background: var(--surface2); }
+
+  .main { max-width: 1400px; margin: 0 auto; padding: 1.5rem 2rem 3rem; }
+
+  .metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+  .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; box-shadow: var(--shadow); }
+  .metric-card .m-label { font-size: 11px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+  .metric-card .m-value { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 600; color: var(--text); line-height: 1; }
+  .metric-card .m-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+  .metric-card.accent { border-left: 3px solid var(--accent); }
+  .metric-card.green { border-left: 3px solid var(--accent2); }
+  .metric-card.blue { border-left: 3px solid var(--blue); }
+
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 1rem; }
+  .search-wrap { position: relative; flex: 1; min-width: 220px; max-width: 340px; }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text3); }
+  .search-input { width: 100%; height: 36px; padding: 0 12px 0 34px; font-size: 13px; font-family: 'DM Sans', sans-serif; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); outline: none; transition: border 0.15s; }
+  .search-input:focus { border-color: var(--accent); }
+  select { height: 36px; padding: 0 28px 0 10px; font-size: 13px; font-family: 'DM Sans', sans-serif; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%239e9d97' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
+  select:focus { border-color: var(--accent); outline: none; }
+  .toolbar-right { margin-left: auto; display: flex; gap: 8px; }
+
+  .add-form { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.25rem; box-shadow: var(--shadow); display: none; }
+  .add-form h3 { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 11px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-group input, .form-group select { height: 36px; padding: 0 10px; font-size: 13px; font-family: 'DM Sans', sans-serif; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); outline: none; width: 100%; }
+  .form-group input:focus, .form-group select:focus { border-color: var(--accent); background: var(--surface); }
+  .form-group input::placeholder { color: var(--text3); }
+  .form-actions { display: flex; gap: 8px; }
+
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
+  thead { background: var(--surface2); }
+  th { padding: 11px 14px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); white-space: nowrap; cursor: pointer; user-select: none; }
+  th:hover { color: var(--text); }
+  td { padding: 11px 14px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .company-name { font-weight: 500; }
+  .badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: var(--green-bg); color: var(--green-text); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber-text); }
+  .badge-blue { background: var(--blue-bg); color: var(--blue-text); }
+  .badge-gray { background: var(--gray-bg); color: var(--gray-text); }
+  .source-pill { display: inline-block; padding: 2px 7px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; font-size: 11px; color: var(--text2); }
+  .icon-btn { background: none; border: none; cursor: pointer; color: var(--text3); padding: 4px 5px; border-radius: 4px; font-size: 14px; transition: all 0.12s; }
+  .icon-btn:hover { color: var(--text); background: var(--surface2); }
+  .action-cell { display: flex; gap: 2px; }
+  .no-data { text-align: center; padding: 3rem; color: var(--text3); font-size: 14px; }
+  .loading-row td { text-align: center; padding: 2.5rem; color: var(--text3); }
+
+  .pagination { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text2); }
+  .page-btns { display: flex; gap: 6px; }
+  .page-btn { height: 30px; min-width: 30px; padding: 0 8px; font-size: 13px; font-family: 'DM Sans', sans-serif; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text2); cursor: pointer; transition: all 0.12s; }
+  .page-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+  .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--text); color: #fff; padding: 10px 18px; border-radius: var(--radius-sm); font-size: 13px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); opacity: 0; transform: translateY(8px); transition: all 0.25s; pointer-events: none; z-index: 999; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 900px) {
+    .metrics { grid-template-columns: repeat(3, 1fr); }
+    .main { padding: 1rem; }
+    .header { padding: 0 1rem; height: auto; min-height: 60px; flex-wrap: wrap; gap: 8px; padding: 10px 1rem; }
+    .header-right { flex-wrap: wrap; gap: 6px; }
+    .btn { height: 30px; padding: 0 10px; font-size: 12px; }
+  }
+  @media (max-width: 600px) {
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .metric-card .m-value { font-size: 22px; }
+    .header h1 { font-size: 14px; }
+    .header-sub { display: none; }
+    .header-right .btn-outline { display: none; }
+    .toolbar { gap: 6px; }
+    .toolbar select { font-size: 12px; height: 32px; }
+    .search-input { font-size: 12px; height: 32px; }
+    .btn-light { height: 32px; font-size: 12px; padding: 0 10px; }
+    /* Table scrolls horizontally on mobile */
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { min-width: 700px; }
+    td, th { padding: 8px 10px; font-size: 12px; }
+    /* Metric cards smaller on mobile */
+    .metric-card { padding: 10px; }
+    .metric-card .m-label { font-size: 10px; }
+    /* Add PPA button stays visible */
+    .btn-accent { display: inline-flex !important; }
+    /* Pagination smaller */
+    .pagination { padding: 8px 12px; font-size: 12px; }
+    .page-btn { height: 26px; font-size: 12px; }
+    /* Form grid single column on mobile */
+    .form-grid { grid-template-columns: 1fr; }
+    .main { padding: 0.75rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<header class="header">
+  <div class="header-left">
+    <div class="logo">⚡</div>
+    <div>
+      <h1>India Solar PPA Tracker</h1>
+      <div class="header-sub">Power Purchase Agreements · Live shared database</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="sync-status">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span style="color:rgba(255,255,255,0.5);font-size:12px" id="sync-label">Connected</span>
+    </div>
+    <button class="btn btn-outline" onclick="downloadTemplate()">↓ Template</button>
+    <button class="btn btn-outline" onclick="document.getElementById('csv-import').click()">↑ Import CSV</button>
+    <input type="file" id="csv-import" accept=".csv" style="display:none" onchange="importCSV(event)" />
+    <button class="btn btn-outline" onclick="exportCSV()">↓ Export CSV</button>
+    <button class="btn btn-accent" onclick="toggleForm()">+ Add PPA</button>
+  </div>
+</header>
+
+<div class="main">
+
+  <div class="metrics">
+    <div class="metric-card accent">
+      <div class="m-label">Total PPAs</div>
+      <div class="m-value" id="m-total">—</div>
+      <div class="m-sub">tracked entries</div>
+    </div>
+    <div class="metric-card green">
+      <div class="m-label">Total capacity</div>
+      <div class="m-value" id="m-mw">—</div>
+      <div class="m-sub">MW allotted</div>
+    </div>
+    <div class="metric-card blue">
+      <div class="m-label">Avg tariff</div>
+      <div class="m-value" id="m-tariff">—</div>
+      <div class="m-sub">₹ per kWh</div>
+    </div>
+    <div class="metric-card">
+      <div class="m-label">States covered</div>
+      <div class="m-value" id="m-states">—</div>
+      <div class="m-sub">across India</div>
+    </div>
+    <div class="metric-card">
+      <div class="m-label">Active PPAs</div>
+      <div class="m-value" id="m-active">—</div>
+      <div class="m-sub">allotted / signed</div>
+    </div>
+  </div>
+
+  <div class="add-form" id="add-form">
+    <h3>📋 <span id="form-title">Add new PPA entry</span></h3>
+    <div class="form-grid">
+      <div class="form-group"><label>Company / Developer *</label><input id="f-company" placeholder="e.g. Adani Green Energy" /></div>
+      <div class="form-group"><label>State *</label><input id="f-state" placeholder="e.g. Rajasthan" /></div>
+      <div class="form-group"><label>Capacity (MW) *</label><input id="f-capacity" type="number" placeholder="e.g. 500" /></div>
+      <div class="form-group"><label>Tariff (₹/kWh)</label><input id="f-tariff" type="number" step="0.01" placeholder="e.g. 2.15" /></div>
+      <div class="form-group"><label>Offtaker</label><input id="f-offtaker" placeholder="e.g. SECI, GUVNL, DISCOMS" /></div>
+      <div class="form-group"><label>Tender / Scheme</label><input id="f-tender" placeholder="e.g. ISTS-IX 2GW" /></div>
+      <div class="form-group"><label>Allotment date</label><input id="f-date" type="date" /></div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="f-status">
+          <option value="">Select status</option>
+          <option>Allotted</option>
+          <option>PPA signed</option>
+          <option>Under construction</option>
+          <option>Commissioned</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Source</label>
+        <select id="f-source">
+          <option value="">Select source</option>
+          <option>MNRE</option><option>SECI</option><option>RECI</option>
+          <option>Mercom</option><option>NTPC</option><option>News</option>
+          <option>Twitter/X</option><option>Manual</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Entry type ⭐</label>
+        <select id="f-entry-type">
+          <option value="">Select type</option>
+          <option>Tender Allotted</option>
+          <option>Tender Issued</option>
+          <option>PPA Signed</option>
+          <option>Bid Won</option>
+          <option>Policy / Regulation</option>
+          <option>General News</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Source URL</label><input id="f-link" placeholder="https://..." /></div>
+      <div class="form-group"><label>Notes</label><input id="f-notes" placeholder="Any additional info" /></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-accent" onclick="saveEntry()" id="save-btn">Save entry</button>
+      <button class="btn btn-light" onclick="toggleForm()">Cancel</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.4"/><line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <input class="search-input" id="search" placeholder="Search company, offtaker, tender..." oninput="renderTable()" />
+    </div>
+    <select id="f-state-filter" onchange="renderTable()"><option value="">All states</option></select>
+    <select id="f-type-filter" onchange="renderTable()">
+      <option value="">All types</option>
+      <option>Tender Allotted</option>
+      <option>Tender Issued</option>
+      <option>PPA Signed</option>
+      <option>Bid Won</option>
+      <option>Policy / Regulation</option>
+      <option>General News</option>
+    </select>
+    <select id="f-status-filter" onchange="renderTable()">
+      <option value="">All statuses</option>
+      <option>Allotted</option><option>PPA signed</option>
+      <option>Under construction</option><option>Commissioned</option>
+    </select>
+    <select id="f-source-filter" onchange="renderTable()">
+      <option value="">All sources</option>
+      <option>MNRE</option><option>SECI</option><option>RECI</option>
+      <option>Mercom</option><option>NTPC</option><option>News</option>
+      <option>Twitter/X</option><option>Manual</option>
+    </select>
+    <button class="btn btn-light" onclick="clearFilters()" style="font-size:12px">✕ Clear</button>
+    <div class="toolbar-right">
+      <button class="btn btn-light" onclick="loadData()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortBy('company')">Company ↕</th>
+            <th onclick="sortBy('entry_type')">Type ↕</th>
+            <th onclick="sortBy('state')">State ↕</th>
+            <th onclick="sortBy('capacity')">Cap. (MW) ↕</th>
+            <th onclick="sortBy('tariff')">Tariff ↕</th>
+            <th onclick="sortBy('offtaker')">Offtaker ↕</th>
+            <th onclick="sortBy('tender')">Tender / Scheme ↕</th>
+            <th onclick="sortBy('date')">Allotment date ↕</th>
+            <th onclick="sortBy('status')">Status ↕</th>
+            <th>Source</th>
+            <th>News link</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body">
+          <tr class="loading-row"><td colspan="10">Loading PPA data from database...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      <span id="page-info" style="color:var(--text3)">—</span>
+      <div class="page-btns">
+        <button class="page-btn" id="prev-btn" onclick="changePage(-1)">← Prev</button>
+        <button class="page-btn" id="next-btn" onclick="changePage(1)">Next →</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SUPABASE_URL = 'https://aycudevttcsyrckgfnaj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5Y3VkZXZ0dGNzeXJja2dmbmFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjcyMTUsImV4cCI6MjA5MTgwMzIxNX0.TaW5xYIGwpBywrFJRNtf7m9PR3cTEYnXViDxEncEpyw';
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const PAGE_SIZE = 15;
+let allData = [];
+let sortKey = 'date', sortDir = -1, page = 1, editId = null;
+
+function setSyncStatus(state) {
+  const dot = document.getElementById('sync-dot');
+  const label = document.getElementById('sync-label');
+  dot.className = 'sync-dot' + (state === 'syncing' ? ' syncing' : state === 'error' ? ' error' : '');
+  label.textContent = state === 'syncing' ? 'Syncing...' : state === 'error' ? 'Error' : 'Live';
+}
+
+async function loadData() {
+  setSyncStatus('syncing');
+  try {
+    const { data, error } = await db.from('ppa_entries').select('*').order('date', { ascending: false, nullsFirst: false });
+    if (error) throw error;
+    allData = data || [];
+    setSyncStatus('connected');
+    updateMetrics();
+    renderTable();
+    updateStateFilter();
+  } catch(e) {
+    setSyncStatus('error');
+    showToast('Error loading data: ' + e.message);
+    document.getElementById('tbl-body').innerHTML = `<tr class="loading-row"><td colspan="10">Could not connect to database. Check connection.</td></tr>`;
+  }
+}
+
+function toggleForm() {
+  const f = document.getElementById('add-form');
+  const open = f.style.display === 'block';
+  f.style.display = open ? 'none' : 'block';
+  if (open) resetForm();
+  else { document.getElementById('form-title').textContent = editId ? 'Edit PPA entry' : 'Add new PPA entry'; f.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+}
+function resetForm() {
+  ['f-company','f-state','f-capacity','f-tariff','f-offtaker','f-tender','f-date','f-link','f-notes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-status').value = '';
+  document.getElementById('f-source').value = '';
+  editId = null;
+  document.getElementById('form-title').textContent = 'Add new PPA entry';
+}
+
+async function saveEntry() {
+  const company = document.getElementById('f-company').value.trim();
+  const state = document.getElementById('f-state').value.trim();
+  const capacity = parseFloat(document.getElementById('f-capacity').value);
+  if (!company || !state || isNaN(capacity)) { showToast('Please fill in Company, State and Capacity'); return; }
+
+  const btn = document.getElementById('save-btn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+
+  const entry = {
+    company, state, capacity,
+    tariff: parseFloat(document.getElementById('f-tariff').value) || null,
+    offtaker: document.getElementById('f-offtaker').value.trim(),
+    tender: document.getElementById('f-tender').value.trim(),
+    date: document.getElementById('f-date').value || null,
+    status: document.getElementById('f-status').value,
+    source: document.getElementById('f-source').value,
+    link: document.getElementById('f-link').value.trim(),
+    notes: document.getElementById('f-notes').value.trim(),
+    entry_type: document.getElementById('f-entry-type').value,
+  };
+
+  try {
+    let error;
+    if (editId) {
+      ({ error } = await db.from('ppa_entries').update(entry).eq('id', editId));
+    } else {
+      ({ error } = await db.from('ppa_entries').insert([entry]));
+    }
+    if (error) throw error;
+    showToast(editId ? 'Entry updated ✓' : 'PPA added — visible to your whole team ✓');
+    toggleForm();
+    await loadData();
+  } catch(e) {
+    showToast('Error saving: ' + e.message);
+  } finally {
+    btn.textContent = 'Save entry'; btn.disabled = false;
+  }
+}
+
+async function deleteEntry(id) {
+  if (!confirm('Delete this PPA entry? This will remove it for everyone.')) return;
+  try {
+    const { error } = await db.from('ppa_entries').delete().eq('id', id);
+    if (error) throw error;
+    showToast('Entry deleted');
+    await loadData();
+  } catch(e) {
+    showToast('Error deleting: ' + e.message);
+  }
+}
+
+function editEntry(id) {
+  const e = allData.find(d => d.id === id); if (!e) return;
+  editId = id;
+  document.getElementById('f-company').value = e.company || '';
+  document.getElementById('f-state').value = e.state || '';
+  document.getElementById('f-capacity').value = e.capacity || '';
+  document.getElementById('f-tariff').value = e.tariff || '';
+  document.getElementById('f-offtaker').value = e.offtaker || '';
+  document.getElementById('f-tender').value = e.tender || '';
+  document.getElementById('f-date').value = e.date || '';
+  document.getElementById('f-status').value = e.status || '';
+  document.getElementById('f-source').value = e.source || '';
+  document.getElementById('f-link').value = e.link || '';
+  document.getElementById('f-notes').value = e.notes || '';
+  document.getElementById('f-entry-type').value = e.entry_type || '';
+  document.getElementById('form-title').textContent = 'Edit PPA entry';
+  document.getElementById('add-form').style.display = 'block';
+  document.getElementById('add-form').scrollIntoView({behavior:'smooth'});
+}
+
+function sortBy(k) {
+  if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = 1; }
+  renderTable();
+}
+
+function getFiltered() {
+  const s = document.getElementById('search').value.toLowerCase();
+  const fst = document.getElementById('f-state-filter').value;
+  const fss = document.getElementById('f-status-filter').value;
+  const fso = document.getElementById('f-source-filter').value;
+  const ftype = document.getElementById('f-type-filter').value;
+  return allData.filter(d => {
+    if (s && !([d.company,d.offtaker,d.tender,d.state,d.notes,d.entry_type].join(' ').toLowerCase().includes(s))) return false;
+    if (fst && d.state !== fst) return false;
+    if (fss && d.status !== fss) return false;
+    if (fso && d.source !== fso) return false;
+    if (ftype && d.entry_type !== ftype) return false;
+    return true;
+  }).sort((a,b) => {
+    if (sortKey === 'date') {
+      const da = a.date || '';
+      const db = b.date || '';
+      if (!da && !db) return 0;
+      if (!da) return 1;   // nulls go to bottom always
+      if (!db) return -1;
+      return da > db ? -1 : da < db ? 1 : 0; // always latest first
+    }
+    let av = a[sortKey] ?? '', bv = b[sortKey] ?? '';
+    if (typeof av === 'number' || (!isNaN(av) && av !== '')) return (parseFloat(av) - parseFloat(bv)) * sortDir;
+    return String(av).localeCompare(String(bv)) * sortDir;
+  });
+}
+
+function renderTable() {
+  const filtered = getFiltered();
+  const total = filtered.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (page > pages) page = pages;
+  const slice = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+  const body = document.getElementById('tbl-body');
+  if (!slice.length) {
+    body.innerHTML = `<tr><td colspan="10" class="no-data">No PPA entries found. Add your first entry or adjust filters.</td></tr>`;
+  } else {
+    body.innerHTML = slice.map(d => {
+      const badge = d.status === 'Commissioned' ? 'badge-green' : d.status === 'PPA signed' ? 'badge-blue' : d.status === 'Under construction' ? 'badge-amber' : 'badge-gray';
+      const linkHtml = d.link ? `<a href="${d.link}" target="_blank" style="font-size:11px;color:var(--blue);margin-left:4px;text-decoration:none">↗</a>` : '';
+      return `<tr>
+        <td>
+          <span class="company-name">${d.company&&d.company!=='⚠️ Review needed'?d.company:'—'}</span>
+          ${d.notes ? `<br><span style="font-size:11px;color:var(--text3);line-height:1.4;display:block;max-width:200px">${d.notes.replace('[AUTO]','').replace('⚠️ Review needed','').trim().slice(0,90)}${d.notes.length>90?'...':''}</span>` : ''}
+        </td>
+        <td>${d.entry_type ? `<span class="badge ${
+          d.entry_type==='Tender Allotted'?'badge-green':
+          d.entry_type==='Bid Won'?'badge-green':
+          d.entry_type==='PPA Signed'?'badge-blue':
+          d.entry_type==='Tender Issued'?'badge-amber':
+          d.entry_type==='Policy / Regulation'?'badge-gray':'badge-gray'
+        }">${d.entry_type}</span>` : `<span style="color:var(--text3);font-size:11px">Not set</span>`}</td>
+        <td>${d.state||'—'}</td>
+        <td style="font-family:'Space Grotesk',sans-serif;font-weight:500">${d.capacity!=null?Number(d.capacity).toLocaleString('en-IN'):'—'}</td>
+        <td>${d.tariff!=null?'₹'+Number(d.tariff).toFixed(2):'—'}</td>
+        <td>${d.offtaker||'—'}</td>
+        <td style="font-size:12px;color:var(--text2)">${d.tender||'—'}</td>
+        <td style="white-space:nowrap">${d.date||'—'}</td>
+        <td><span class="badge ${badge}">${d.status||'—'}</span></td>
+        <td>${d.source?`<span class="source-pill">${d.source}</span>`:'—'}</td>
+        <td>${d.link?`<a href="${d.link}" target="_blank" style="color:var(--blue);font-size:12px;text-decoration:none;display:inline-flex;align-items:center;gap:3px">↗ Read article</a>`:'—'}</td>
+        <td><div class="action-cell"><button class="icon-btn" title="Edit" onclick="editEntry(${d.id})">✎</button><button class="icon-btn" title="Delete" onclick="deleteEntry(${d.id})">✕</button></div></td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('page-info').textContent = total > 0 ? `Showing ${(page-1)*PAGE_SIZE+1}–${Math.min(page*PAGE_SIZE,total)} of ${total} entries` : '0 results';
+  document.getElementById('prev-btn').disabled = page === 1;
+  document.getElementById('next-btn').disabled = page >= pages;
+}
+
+function changePage(d) { page += d; renderTable(); }
+
+function clearFilters() {
+  document.getElementById('search').value = '';
+  document.getElementById('f-state-filter').value = '';
+  document.getElementById('f-status-filter').value = '';
+  document.getElementById('f-source-filter').value = '';
+  document.getElementById('f-type-filter').value = '';
+  renderTable();
+}
+
+function updateStateFilter() {
+  const states = [...new Set(allData.map(d => d.state).filter(Boolean))].sort();
+  const sel = document.getElementById('f-state-filter');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All states</option>' + states.map(s => `<option value="${s}"${s===cur?' selected':''}>${s}</option>`).join('');
+}
+
+function updateMetrics() {
+  const total = allData.length;
+  const mw = allData.reduce((s,d) => s + (Number(d.capacity)||0), 0);
+  const tariffs = allData.filter(d => d.tariff).map(d => Number(d.tariff));
+  const avg = tariffs.length ? tariffs.reduce((a,b) => a+b,0)/tariffs.length : null;
+  const states = new Set(allData.map(d => d.state).filter(Boolean)).size;
+  const active = allData.filter(d => d.status==='Allotted'||d.status==='PPA signed').length;
+  document.getElementById('m-total').textContent = total;
+  document.getElementById('m-mw').textContent = mw.toLocaleString('en-IN');
+  document.getElementById('m-tariff').textContent = avg ? '₹'+avg.toFixed(2) : '—';
+  document.getElementById('m-states').textContent = states;
+  document.getElementById('m-active').textContent = active;
+}
+
+function exportCSV() {
+  const headers = ['ID','Company','State','Capacity (MW)','Tariff (₹/kWh)','Offtaker','Tender/Scheme','Allotment Date','Status','Source','Link','Notes'];
+  const rows = allData.map(d => [d.id,d.company,d.state,d.capacity,d.tariff||'',d.offtaker,d.tender,d.date,d.status,d.source,d.link,d.notes]);
+  const csv = [headers,...rows].map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'india_solar_ppa_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  showToast('CSV exported ✓');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function downloadTemplate() {
+  const headers = ['company','state','capacity_mw','tariff_rs_per_kwh','offtaker','tender_scheme','allotment_date_yyyy_mm_dd','status','source','link','notes'];
+  const example = ['Adani Green Energy','Rajasthan','500','2.15','SECI','ISTS-IX 2GW','2024-01-15','Allotted','Mercom','https://...','Optional notes'];
+  const statusNote = ['','','','','','','','Options: Allotted / PPA signed / Under construction / Commissioned','Options: MNRE / SECI / RECI / Mercom / NTPC / News / Twitter/X / Manual','',''];
+  const csv = [headers, example, statusNote].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'ppa_import_template.csv';
+  a.click();
+  showToast('Template downloaded ✓ — fill it and import!');
+}
+
+async function importCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) { showToast('CSV is empty or invalid'); return; }
+
+  // Parse header row
+  const headers = lines[0].split(',').map(h => h.replace(/"/g,'').trim().toLowerCase());
+
+  const colIndex = (names) => {
+    for (const n of names) { const i = headers.indexOf(n); if (i > -1) return i; }
+    return -1;
+  };
+
+  const ci = {
+    company:  colIndex(['company']),
+    state:    colIndex(['state']),
+    capacity: colIndex(['capacity_mw','capacity']),
+    tariff:   colIndex(['tariff_rs_per_kwh','tariff']),
+    offtaker: colIndex(['offtaker']),
+    tender:   colIndex(['tender_scheme','tender']),
+    date:     colIndex(['allotment_date_yyyy_mm_dd','allotment_date','date']),
+    status:   colIndex(['status']),
+    source:   colIndex(['source']),
+    link:     colIndex(['link']),
+    notes:    colIndex(['notes']),
+  };
+
+  const parseRow = (line) => {
+    const cols = [];
+    let cur = '', inQ = false;
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    cols.push(cur.trim());
+    return cols;
+  };
+
+  const entries = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseRow(lines[i]);
+    const company = ci.company > -1 ? cols[ci.company] : '';
+    const state   = ci.state   > -1 ? cols[ci.state]   : '';
+    const capacity = ci.capacity > -1 ? parseFloat(cols[ci.capacity]) : null;
+    if (!company || !state || !capacity) continue; // skip incomplete rows
+    entries.push({
+      company,
+      state,
+      capacity,
+      tariff:   ci.tariff   > -1 ? parseFloat(cols[ci.tariff])   || null : null,
+      offtaker: ci.offtaker > -1 ? cols[ci.offtaker] : '',
+      tender:   ci.tender   > -1 ? cols[ci.tender]   : '',
+      date:     ci.date     > -1 ? cols[ci.date]     || null : null,
+      status:   ci.status   > -1 ? cols[ci.status]   : '',
+      source:   ci.source   > -1 ? cols[ci.source]   : '',
+      link:     ci.link     > -1 ? cols[ci.link]     : '',
+      notes:    ci.notes    > -1 ? cols[ci.notes]    : '',
+    });
+  }
+
+  if (!entries.length) { showToast('No valid rows found. Check the template format.'); event.target.value=''; return; }
+
+  if (!confirm(`Import ${entries.length} PPA entries into the shared database?`)) { event.target.value=''; return; }
+
+  setSyncStatus('syncing');
+  showToast(`Importing ${entries.length} entries...`);
+  try {
+    const { error } = await db.from('ppa_entries').insert(entries);
+    if (error) throw error;
+    showToast(`✓ ${entries.length} entries imported — visible to your whole team!`);
+    await loadData();
+  } catch(e) {
+    showToast('Import error: ' + e.message);
+    setSyncStatus('error');
+  }
+  event.target.value = '';
+}
+
+// Auto-refresh every 60 seconds
+setInterval(loadData, 60000);
+
+// Initial load
+loadData();
+</script>
+<div class="mobile-bar">
+  <button class="btn btn-accent" style="flex:1" onclick="toggleForm()">+ Add PPA</button>
+  <button class="btn btn-light" style="flex:1" onclick="loadData()">↻ Refresh</button>
+  <button class="btn btn-light" style="flex:1" onclick="exportCSV()">↓ CSV</button>
+</div>
+
+<style>
+.mobile-bar {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 10px 1rem;
+  gap: 8px;
+  z-index: 99;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
+}
+@media (max-width: 600px) {
+  .mobile-bar { display: flex; }
+  .main { padding-bottom: 80px; }
+}
+</style>
+</html>

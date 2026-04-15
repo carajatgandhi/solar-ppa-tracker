@@ -315,7 +315,7 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const PAGE_SIZE = 15;
 let allData = [];
-let sortKey = 'date', sortDir = -1, page = 1, editId = null;
+let sortKey = 'id', sortDir = -1, page = 1, editId = null;
 
 function setSyncStatus(state) {
   const dot = document.getElementById('sync-dot');

@@ -252,6 +252,7 @@ def detect_entry_type(text):
     return "General News"
 
 
+def extract_state(text):
     """Try to extract Indian state from text."""
     states = {
         "rajasthan": "Rajasthan", "gujarat": "Gujarat",
